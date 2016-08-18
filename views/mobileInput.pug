@@ -1,0 +1,11 @@
+extends layout
+
+block content
+  h1= mobilePage
+  p passes button info - need to integrate firebase status
+  p Post from mediaOrientation
+  form(action="/mobile", method="POST")
+    input(type='text', name="test", placeholder='default')
+    input(type='text', name="more", placeholder='default2')
+    button(type="submit") Submit
+  

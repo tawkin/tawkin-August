@@ -1,0 +1,153 @@
+<html>
+<head>
+  <script src="https://www.gstatic.com/firebasejs/3.2.1/firebase.js"></script>
+  <script src='https://ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js'></script>
+  <link rel="stylesheet" type="text/css" href="/stylesheets/blackwhite.css">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>listen for phone motion</title>
+  <script src="../javascripts/connectFirebase.js"></script>
+</head>
+<body> 
+
+<!-- use this file tracks motion of phone > firebase > retrieves changes 
+      localtunnel.me if in localhost dev mode -->
+
+firebase
+
+ <!-- place holders for phone and motion feedback -->
+ <textarea id="state" rows="1" cols="10"> asleep </textarea>
+ <textarea id="gamma" rows="1" cols="4"> 0 </textarea>
+ <textarea id="message" rows="1" cols="25"> empty </textarea>
+ 
+ <p>Raise and lower phone to control recording (and see numbers change.) </p>
+   
+ <button class="button" onclick="stopListening();"> stop </button>
+ 
+ 
+<script>
+  var hiStep = 70; // gamma > hiStep = @ear
+  var loStep = 20; // gamma < loStep = @rest
+  var ignore = 1500; // ignore segments less than this (1500ms)
+  var sequenceId = 0;
+  var startSessionTime = Number(new Date());
+  
+  var gammaFireRef = firebase.database().ref('tawkin/gamma');
+  var stateFireRef = firebase.database().ref('tawkin/state');
+  var audioSegmentFireRef = firebase.database().ref('audioSegment');
+  
+
+  var tawkin = {                // tawkin object - controller
+      tID:"John",               // unique timestamp thing?
+      gamma: 45,                   // 0-90 tilt -- start in middle @pause  
+      priorGamma: 0,
+      state:"default",          // @record, @play, @pause
+      priorState:"default",    
+  }
+
+  var audioSegment = {
+      sequence: " ",
+      //type: " ",  // audio or video
+      urllink: "audioUrl",  // link to audioRec storage
+      duration: 0,
+      mark: 0,      
+      message: " "   // temp 
+  };
+
+  gammaFireRef.set(null);    // clear firebase
+  stateFireRef.set(null);
+  audioSegmentFireRef.set(null);
+  
+
+function handleOrientation(event){
+  console.log(sequenceId);
+  tawkin.priorState = tawkin.state;   
+  var  gamma = Math.abs(event.gamma);  // tilt of mobile
+  tawkin.gamma = Math.round(gamma);
+
+  if (tawkin.gamma != tawkin.priorGamma)
+  {
+    gammaFireRef.push({'gamma': tawkin.gamma});  // push gamma to fireBase
+  }
+
+  tawkin.priorGamma = tawkin.gamma;
+
+  if (tawkin.gamma < loStep) {         // low point threshold 
+      tawkin.state = "@play";          // flat
+  }  else if (tawkin.gamma > hiStep) { // high point threshold
+       tawkin.state = "@record";       //  ?? verify with proximity sensor 
+  }  else {   
+       tawkin.state = "@pause";        // in between
+  }     
+ 
+  if (tawkin.state != tawkin.priorState){
+    stateFireRef.push({'state': tawkin.state, 'priorState': tawkin.priorState});  //push if state changes
+  } 
+}
+
+window.addEventListener('deviceorientation', handleOrientation);
+
+ 
+gammaFireRef.on("child_added", function(snapshot, prevChildKey)  // when gamma changes
+{
+  var gammaFire = snapshot.val();
+  tawkin.gamma = gammaFire.gamma;
+  __message('gamma', tawkin.gamma);
+});
+
+stateFireRef.on("child_added", function(snapshot, prevChildKey)   // when state changes
+{ 
+  // var startTime = Number(new Date());  // moved to @play and @record
+  var stateFire = snapshot.val();
+  tawkin.state = stateFire.state;
+  __message('state', tawkin.state);
+});
+
+
+    
+function __message(area, message){
+  document.getElementById(area).value = message;
+  console.log(message);
+}
+ 
+function __log(e, data) {
+    log.innerHTML += "\n" + e + " " + (data || '');
+} 
+  
+
+function recordAudio(){
+   // start startRecording          // trigger new segment object or just overwrite existing ??
+   __log('start recording audio: ' + sequenceId);
+   audioSegment.message = "start recording audio";
+}
+
+function uploadAudioRec(){
+  __log('uploading:' + sequenceId);
+}
+
+  
+function stopListening(){
+  __message('message', "can't hear you any more"); 
+  __log( Number(new Date()) - startSessionTime); // tmp
+  tawkin.state = "@stop";
+  window.removeEventListener('deviceorientation', handleOrientation);  // stop listening to device
+}
+</script>
+
+<div id="header">
+</div>
+
+<div id="nav">
+<p> tawkin</p>
+</div>
+
+<div id="section">
+<h3>Log</h3>
+<pre id="log"></pre>
+</div>
+
+<div id="footer">
+tawkin.com
+</div>
+
+</body>
+</html>

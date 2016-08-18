@@ -1,0 +1,215 @@
+<html>
+<head>
+  <script src="https://www.gstatic.com/firebasejs/3.2.1/firebase.js"></script>
+  <script src='https://ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js'></script>
+  <link rel="stylesheet" type="text/css" href="/stylesheets/blackwhite.css">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>listen for phone motion</title>
+  <script src="../javascripts/connectFirebase.js"></script>
+</head>
+<body> 
+
+<!-- use this file to handle logic of  phone > firebase > retrieves changes 
+     mobile use localtunnel.me if in localhost dev mode
+
+firebase  ??by passes firebase -- uses localtunnel.me!! mobile/mobile.html
+-->
+
+ <!-- place holders for phone and motion feedback -->
+ <textarea id="state" rows="1" cols="10"> asleep </textarea>
+ <textarea id="gamma" rows="1" cols="4"> 0 </textarea>
+ <textarea id="message" rows="1" cols="25"> empty </textarea>
+ 
+ <p>handle @play, @rest, and @ record logic </p>
+   
+ <button class="button" onclick="stopListening();"> stop </button>
+ 
+ 
+<script>
+  var hiStep = 70; // gamma > hiStep = @ear
+  var loStep = 20; // gamma < loStep = @rest
+  var ignore = 1200; // ignore segments less than this (1500ms)
+  var sequenceId = 0;
+  var arr = [];
+  var videoId = "xIPFpMy_Kc0";   // get from mobile before putting in tawkin
+  var startTimePlay = Number(new Date());
+  var startTimeRecord = Number(new Date());
+  var startSessionTime = Number(new Date());
+  
+  var gammaFireRef = firebase.database().ref('tawkin/gamma');
+  var stateFireRef = firebase.database().ref('tawkin/state');
+  var tawkinFireRef = firebase.database().ref('tawkin'); // load after @ or end??
+   
+
+var tawkin = {                // tawkin object - controller : meta data later
+    tId:"John",               // unique timestamp thing?
+    gamma: 45,                   // 0-90 tilt -- start in middle @pause  
+    priorGamma: 0,
+    state: "default",          // @record, @play, @pause
+    priorState: "default",  
+    sequence: 0,
+    audioUrl: "default",
+    audioStartTime: 0,      //timestamp
+    audioEndTime: 0,
+    videoId: "see mobile", // set from mobile??
+    videoStartSpot: 0,      // 'mark' in video
+    videoEndSpot: 0,
+}                           
+//split object audio/video/state?? duration? push partial to db @ end??
+
+  
+gammaFireRef.set(null);    // clear firebase
+stateFireRef.set(null);
+
+ 
+gammaFireRef.on("child_added", function(snapshot, prevChildKey)  // when gamma changes
+{
+  var gammaFire = snapshot.val();
+  tawkin.gamma = gammaFire.gamma;
+  __message('gamma', tawkin.gamma);
+});
+
+
+stateFireRef.on("child_added", function(snapshot, prevChildKey)   // when state changes
+{ 
+  // var startTime = Number(new Date());  // moved to @play and @record
+  var stateFire = snapshot.val();
+  tawkin.state = stateFire.state;
+  tawkin.priorState = stateFire.priorState;
+  __message('message', arr.length);
+  __message('state', tawkin.state);
+  __logState("p:" + tawkin.priorState + "  s:" + tawkin.state );    
+  
+    if (tawkin.priorState=='@pause' && tawkin.state=='@play'){
+      arr.push(tawkin); // push before starting new one
+      sequenceId++; //extra step - integrate tawkin.sequence
+      tawkin.sequence=sequenceId;
+      playVideo();
+    } else if (tawkin.priorState=='@record' && tawkin.state=='@play'){
+      skippedPause();
+    } else if (tawkin.priorState=='@play' && tawkin.state=='@pause'){
+      pausePlay();
+    } else if (tawkin.priorState=='@record' && tawkin.state=='@pause'){
+      pauseRecord();
+    } else if (tawkin.priorState=='@play' && tawkin.state=='@record'){
+      skippedPause();
+    } else if (tawkin.priorState=='@pause' && tawkin.state=='@record'){
+      recordAudio();
+    } else {
+      console.log("state did not match: " + tawkin.priorState + " " + tawkin.state);
+    }
+    console.log(arr);
+});
+ 
+    
+function __message(area, message){
+  document.getElementById(area).value = message;
+  //console.log(message);
+}
+ 
+function __log(e, data) {
+    log.innerHTML += "\n" + e + " " + (data || '');
+} 
+
+function __logState(e, data) {
+    logState.innerHTML += "\n" + e + " " + (data || '');
+} 
+  
+
+function ignoreSegment(type){          // ignore short segments
+  if (type == 'audio'){
+    var tDiff = tawkin.audioEndTime - tawkin.audioStartTime;
+  }  
+  if (type == 'video'){
+    var tDiff = tawkin.videoEndSpot - tawkin.videoStartSpot;
+  }
+  if (tDiff < ignore ) {
+    if (type='video'){sequenceId--;} // go back a step for video ? audio??
+    __log(type + ' segment ' + sequenceId + ' ignored: ' + tDiff + ' ms');
+  // delete short object ??  
+    return true;
+  } else {
+    // __log('~~ s: ' + startTime + '  e: ' + endTime + '  dif: ' + tDiff);
+    // keep object
+    return false;
+  }
+}
+
+
+function playVideo(){
+   // if !loaded loadVideoById   
+   __log('start playing video :' + sequenceId + " " + videoId);
+   tawkin.videoStartSpot = Number(new Date()); //spot in video (not timestamp)
+    // playVideo  (seekTo?)
+}
+
+function pausePlay(){
+   // push to source object ??
+   tawkin.videoEndSpot = Number(new Date()); //spot in video (not timestamp)
+   ignoreSegment('video');  // ?? logic for ignoring 
+   __log('done playing video :' + sequenceId + ' : ' + (tawkin.videoEndSpot - tawkin.videoStartSpot) + ' ms');
+}
+
+function pauseRecord(){
+   // upload audio (ignore??)
+   tawkin.audioEndTime = Number(new Date());
+   ignoreSegment('audio');  // ?? logic for ignoring 
+   __log('done recording audio : ' + sequenceId + ' : ' + (tawkin.audioEndTime - tawkin.audioStartTime) + ' ms');
+}
+
+function recordAudio(){
+   // start startRecording on mobile ??
+  __log('start recording audio: ' + sequenceId);
+  tawkin.audioStartTime = Number(new Date());
+}
+
+function skippedPause(){
+  __log('skipped a step -- please move a little slower');
+}
+
+function uploadAudioRec(){
+  __log('uploading:' + sequenceId);
+}
+
+ function stopAction(){
+   // end session
+   __log('end of session');
+ }
+  
+function processTawkin(){
+  // determine add silence or freeze? video image to match segment lengths
+  // so that playback will match or handle this on playback operation??
+}
+
+function stopListening(){
+  __message('message', "can't hear you any more"); 
+  __log( Number(new Date()) - startSessionTime); // tmp
+  tawkin.state = "@stop";
+  window.removeEventListener('deviceorientation', handleOrientation);  // stop listening to device
+}
+
+</script>
+
+<div id="header">
+</div>
+
+<div id="nav">
+<p> tawkin</p>
+</div>
+
+<div id="section">
+<h3>Log</h3>
+<pre id="log"></pre>
+</div>
+
+<div id="section">
+<h3>Log State</h3>
+<pre id="logState"></pre>
+</div>
+
+<div id="footer">
+tawkin.com
+</div>
+
+</body>
+</html>

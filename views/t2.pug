@@ -1,0 +1,64 @@
+html
+  head
+    title Testing JavaScript +Expressjs + Pug
+    link(rel='stylesheet', href='/stylesheets/style.css')
+    script(type='text/javascript', src='/javascripts/t2.js')
+    script(type='text/javascript', src='/javascripts/var.js')
+    script(type='text/javascript', src='/javascripts/test.js')
+
+  body
+    script(type="text/javascript").
+      console.log('handed off ' + test1)
+    p red
+    - my_var = ({name: 'Jade', type: 'templating engine'}, {name: 'J2', type: 'text2'})
+    - red = 'redd'
+    p #{red}
+    p #{locals}
+    p #{my_var.name}
+    p white
+    script(type="text/javascript").
+      console.log(t2)
+    ul
+      each val, index in {locals}
+        li= index + ': ' + val
+    script(type="text/javascript").
+      var local_data = JSON.parse(t2)
+    p= {local_data}
+    script(type="text/javascript").
+      console.log('state: ' + hue);
+      var localHue = hue;
+    table
+      tr
+        td Twitter
+        td= {hue}
+      tr
+        td Blog
+        td= {hue}
+    script(type="text/javascript").
+      console.log(localHue);
+
+    - var redBlue = function(i){  
+    -   var vHue = localHue;
+    -   var vue = 'white';
+    -   if(i == "bleu"){vue = 'Blue';
+    - } else {
+    -   vue = 'White';
+    - }
+    -   return vHue; 
+    - }
+    
+    div
+      p white
+      p #{redBlue(' ')} 
+      p red
+    
+    script.
+      var rue ='123';
+    p!= {rue}
+    p done
+    script.
+      console.log(rue + " done");
+    p #{t2}
+
+    div
+       document.innerHTML t2

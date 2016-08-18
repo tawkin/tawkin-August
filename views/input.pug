@@ -1,0 +1,14 @@
+doctype
+html
+  head
+    title= "testing"
+    script(src='/javascripts/alertNotice.js')
+    script(src='/javascripts/var.js')
+  body
+    h1= VideoId
+    form(action="/", method="POST")
+      label(for="vId") Enter YouTube Video Id: 
+      input(name="videoId", type='text', id="vId" placeholder='xIPFpMy_Kc0')
+      button(type="submit") Submit
+    script(type="text/javascript").
+      console.log(hue);

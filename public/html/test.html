@@ -1,0 +1,37 @@
+<html>
+<head>
+  <title>temp folder for testing html instead of rendering</title>
+    <script src="../javascripts/var.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/3.2.1/firebase.js"></script>
+    <script src="../javascripts/connectFirebase.js"></script>
+    <script src="../javascripts/getMobileState.js"></script>
+
+</head>
+<body>
+  <div>
+    <li>
+      <a href="/about">About</a>
+      <p> hue </p>
+    </li>
+  </div>
+  <div>
+  	<p id="demo"></p>
+
+      <script>
+        var carName = "Volvo";
+        document.getElementById("demo").innerHTML = carName + " " + hue + " " + fbStatus ; 
+      </script>
+    
+    <p id="demo2"></p>
+       <script>
+        var carName = "Ohno";
+        document.getElementById("demo2").innerHTML = "state: " + mobileState + " " + ohno ;
+      </script>
+
+
+   </div>
+</body>
+</html>
+
+
+

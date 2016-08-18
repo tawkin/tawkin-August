@@ -1,0 +1,20 @@
+html
+  head
+    title Testing JavaScript +Expressjs + Pug
+    link(rel='stylesheet', href='/stylesheets/style.css')
+    script(type='text/javascript', src='/javascripts/test.js')
+    script(type='text/javascript', src='https://www.gstatic.com/firebasejs/3.2.1/firebase.js')
+    script(type='text/javascript', src='/javascripts/connectFirebase.js')
+    script(type='text/javascript', src='/javascripts/getMobileState.js')
+    
+   
+  body
+    script(type="text/javascript").
+      console.log('handed off ' + test)
+    p #{test}
+    p #{MobileState}
+    script(type="text/javascript").
+      console.log("mobileState: " + mobileState)
+   
+    div
+       document.innerHTML {mobileState}

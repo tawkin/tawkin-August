@@ -1,0 +1,224 @@
+<html>
+<head>
+  <script src="https://www.gstatic.com/firebasejs/3.2.1/firebase.js"></script>
+  <script src='https://ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js'></script>
+  <link rel="stylesheet" type="text/css" href="/stylesheets/blackwhite.css">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>listen for phone motion</title>
+  <script src="../javascripts/connectFirebase.js"></script>
+</head>
+<body> 
+
+<!-- use this file to handle logic of  phone > firebase > retrieves changes 
+     mobile use localtunnel.me if in localhost dev mode
+
+firebase  ??by passes firebase -- uses localtunnel.me!! mobile/mobile.html
+-->
+
+ <!-- place holders for phone and motion feedback -->
+ <textarea id="state" rows="1" cols="10"> asleep </textarea>
+ <textarea id="gamma" rows="1" cols="4"> 0 </textarea>
+ <textarea id="message" rows="1" cols="25"> empty </textarea>
+ 
+ <p>handle @play, @rest, and @ record logic </p>
+   
+ <button class="button" onclick="stopListening();"> stop </button>
+ 
+ 
+<script>
+  var hiStep = 70; // gamma > hiStep = @ear
+  var loStep = 20; // gamma < loStep = @rest
+  var ignore = 1500; // ignore segments less than this (1500ms)
+  var sequenceId = 0;
+  var startTimePlay = Number(new Date());
+  var startTimeRecord = Number(new Date());
+  var startSessionTime = Number(new Date());
+  
+  var gammaFireRef = firebase.database().ref('tawkin/gamma');
+  var stateFireRef = firebase.database().ref('tawkin/state');
+  var audioSegmentFireRef = firebase.database().ref('audioSegment');
+  var videoSegmentFireRef = firebase.database().ref('videoSegment');
+ 
+
+var tawkin = {                // tawkin object - controller
+    tID:"John",               // unique timestamp thing?
+    gamma: 45,                   // 0-90 tilt -- start in middle @pause  
+    priorGamma: 0,
+    state:"default",          // @record, @play, @pause
+    priorState:"default",   
+}
+
+var arr = [];
+
+var audioSegment = {
+    sequence: " ",
+  //  type: " ",  // audio or video
+    urllink: "audioUrl",  // link to audioRec storage
+    duration: 0,
+    mark: 0,      
+    message: " "   // temp 
+};
+
+var videoSegment = {
+    sequence: " ",
+   // type: " ",  // audio or video
+    urllink: "videoUrl",  // link to audioRec storage
+    duration: 0,
+    mark: 0,      
+    message: " "   // temp 
+};
+  
+  gammaFireRef.set(null);    // clear firebase
+  stateFireRef.set(null);
+  audioSegmentFireRef.set(null);
+  videoSegmentFireRef.set(null);
+  
+
+ 
+gammaFireRef.on("child_added", function(snapshot, prevChildKey)  // when gamma changes
+{
+  var gammaFire = snapshot.val();
+  tawkin.gamma = gammaFire.gamma;
+  __message('gamma', tawkin.gamma);
+});
+
+
+stateFireRef.on("child_added", function(snapshot, prevChildKey)   // when state changes
+{ 
+  // var startTime = Number(new Date());  // moved to @play and @record
+  var stateFire = snapshot.val();
+  tawkin.state = stateFire.state;
+  tawkin.priorState = stateFire.priorState;
+  __message('message', arr.length);
+  __message('state', tawkin.state);
+  __logState("p:" + tawkin.priorState + "  s:" + tawkin.state );    
+  //if (tawkin.state != tawkin.priorState){  //handled with 'change'
+    if (tawkin.priorState=='@pause' && tawkin.state=='@play'){
+      arr.push(tawkin); // push before starting new one
+      sequenceId++; //add only for testing 
+      playVideo();
+    } else if (tawkin.priorState=='@record' && tawkin.state=='@play'){
+      skippedPause();
+    } else if (tawkin.priorState=='@play' && tawkin.state=='@pause'){
+      pausePlay();
+    } else if (tawkin.priorState=='@record' && tawkin.state=='@pause'){
+      pauseRecord();
+    } else if (tawkin.priorState=='@play' && tawkin.state=='@record'){
+      skippedPause();
+    } else if (tawkin.priorState=='@pause' && tawkin.state=='@record'){
+      recordAudio();
+    } else {
+      console.log("state did not match: " + tawkin.priorState + " " + tawkin.state);
+    }
+  // }
+});
+ 
+    
+function __message(area, message){
+  document.getElementById(area).value = message;
+  //console.log(message);
+}
+ 
+function __log(e, data) {
+    log.innerHTML += "\n" + e + " " + (data || '');
+} 
+
+function __logState(e, data) {
+    logState.innerHTML += "\n" + e + " " + (data || '');
+} 
+  
+
+function ignoreAudioSeg(startTimeRecord){          // ignore short segments
+  var endTime =  Number(new Date());    // startTime = startRecording
+  var tDiff = endTime - startTimeRecord;
+  if (tDiff < ignore ) {
+  // __log('segment ' + sequenceId + ' ignored: ' + tDiff + ' ms');
+  // delete short object ??  or maybe delete in React
+    return true;
+  } else {
+    // __log('~~ s: ' + startTime + '  e: ' + endTime + '  dif: ' + tDiff);
+    audioSegment.duration = tDiff;
+    audioSegment.message = "ok to push";
+    // keep object
+    return false;
+  }
+}
+
+
+function playVideo(){
+   // if !loaded loadVideoById   // handle on desktop ??
+   // playVideo  (seekTo?)
+   __log('start playing video :' + sequenceId);
+   videoSegment.message = "start playing video";
+ }
+
+ function pausePlay(startTimePlay){
+   // push to source object ??
+   __log('done playing video :' + sequenceId + ' : ' + videoSegment.duration + ' ms');
+   videoSegment.message = "done playing video";
+ }
+
+function pauseRecord(startTimeRecord){
+   ignoreAudioSeg(startTimeRecord);
+   // might need to compare duplicate target records (since source increments)
+   // upload audio
+    __log('done recording audio : ' + sequenceId + ' : ' + audioSegment.duration + ' ms');
+    audioSegment.message = "done recording audio";
+}
+
+function recordAudio(){
+   // start startRecording              // trigger new segment object or just overwrite existing ??
+  __log('start recording audio: ' + sequenceId);
+  audioSegment.message = "start recording audio";
+}
+
+function skippedPause(){
+  __log('skipped a step -- please move a little slower');
+}
+
+function uploadAudioRec(){
+  __log('uploading:' + sequenceId);
+}
+
+ function stopAction(){
+   // end session
+   __log('end of session');
+ }
+  
+function processTawkin(){
+  // determine add silence or freeze? video image to match segment lengths
+  // so that playback will match or handle this on playback operation??
+}
+
+function stopListening(){
+  __message('message', "can't hear you any more"); 
+  __log( Number(new Date()) - startSessionTime); // tmp
+  tawkin.state = "@stop";
+  window.removeEventListener('deviceorientation', handleOrientation);  // stop listening to device
+}
+
+</script>
+
+<div id="header">
+</div>
+
+<div id="nav">
+<p> tawkin</p>
+</div>
+
+<div id="section">
+<h3>Log</h3>
+<pre id="log"></pre>
+</div>
+
+<div id="section">
+<h3>Log State</h3>
+<pre id="logState"></pre>
+</div>
+
+<div id="footer">
+tawkin.com
+</div>
+
+</body>
+</html>
